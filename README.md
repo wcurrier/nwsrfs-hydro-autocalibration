@@ -19,13 +19,17 @@ This repository contains a version of the Northwest River Forecast Center (NWRFC
     
 From R:
 
-        devtools::install_github('NOAA-NWRFC/nwsrfs-hydro-models',subdir='rfchydromodels')
+```R
+devtools::install_github('NOAA-NWRFC/nwsrfs-hydro-models',subdir='rfchydromodels')
+```
 
 or from the command line:
 
-        git clone https://github.com/NOAA-NWRFC/nwsrfs-hydro-models.git
-        cd nwsrfs-hydro-models
-        R CMD INSTALL rfchydromodels
+```bash
+git clone https://github.com/NOAA-NWRFC/nwsrfs-hydro-models.git
+cd nwsrfs-hydro-models
+R CMD INSTALL rfchydromodels
+```
 
 4. The autocalibration scripts will try to install a number of R packages when run. If this fails you may need to install the packages manually. 
 
@@ -75,22 +79,22 @@ Refer to the example basins in the `runs/` directory for the expected directory 
 
 ```
 [LID]/
-├── flow_daily_[LID].csv             # Daily average flow observations (optional)
-├── flow_instantaneous_[LID].csv     # Instantaneous flow observations (optional)
-├── forcing_por_[LID]-[zone #].csv   # Forcing data for each zone (MAP, MAT, PTPS)
-├── pars_default.csv                 # Default parameter file (-99 indicates the parameter will be optimized)
-├── pars_limits.csv                  # Upper/lower limits for parameters that are optimized
-├── [optional files...]
+  ├── flow_daily_[LID].csv             # Daily average flow observations (optional)
+  ├── flow_instantaneous_[LID].csv     # Instantaneous flow observations (optional)
+  ├── forcing_por_[LID]-[zone #].csv   # Forcing data for each zone (MAP, MAT, PTPS)
+  ├── pars_default.csv                 # Default parameter file (-99 indicates the parameter will be optimized)
+  ├── pars_limits.csv                  # Upper/lower limits for parameters that are optimized
+  ├── [optional files...]
 ```
 
 **Optional Files:**
-- `forcing_validation_cv_[fold #]_[LID]-[zone #].csv`: Forcing data for cross-validation folds.
-- `upflow_[RR LID].csv`: Upstream flow data for routing reach (LAGK model).
+- `forcing_validation_cv_[fold #]_[LID]-[zone #].csv`: Forcing data for cross-validation folds. Note that the data for each cross validation fold must be created manually by subsetting your data, but any number of folds is possible. as long as they split the data into even groups. 
+- `upflow_[RR LID].csv`: Upstream flow data for routing reach (LAGK model). A reach may have more than one routed upstream flow input but this is uncommon. 
 
 **Notes:**
-- `LID`: 5-character basin ID (e.g., `FSSO3`)
+- `LID`: 5-character basin ID (e.g., `FSSO3`). Note that this is an arbitrary basin identification code, you may swap in any unique 5 character alphanumeric identifier. 
 - `zone #`: Numeric zone ID (at least one required)
-- `fold #`: Numeric ID for cross-validation fold
+- `fold #`: Numeric ID for cross-validation fold, starting at 1. 
 - `RR LID`: Upstream reach LID (e.g., `WCHW1` for LAGK optimization)
 - Need at least one daily or instanteous flow file for autocalibration 
 
@@ -98,7 +102,7 @@ Refer to the example basins in the `runs/` directory for the expected directory 
 
 ### 1. `run-controller.R`
 
-The `run-controller.R` script is run to create a optimized parameter file (`pars_optimal.csv`).  
+The `run-controller.R` script is run to create an optimized parameter file (`pars_optimal.csv`).  
 
     usage: run-controller.R [--] [--help] [--por] [--overwrite] [--lite]
           [--dir DIR] [--basin BASIN] [--objfun OBJFUN] [--optimizer
@@ -109,7 +113,7 @@ The `run-controller.R` script is run to create a optimized parameter file (`pars
     flags:
       -h, --help        show this help message and exit
       -p, --por         Do a period of record run [default]
-      -ov, --overwrite  Don't create new results dir, overwrite
+      -ov, --overwrite  Don't create new results dir, overwrite the first exising one
       -l, --lite        Testing run with 1/2 the total optimizer iteration
 
     optional arguments:
@@ -120,7 +124,7 @@ The `run-controller.R` script is run to create a optimized parameter file (`pars
                         edds]
       -c, --cvfold      CV fold to run (integer 1-4) [default: none]
       -n, --num_cores   Number of cores to allocate for run, FULL uses all
-                        availavble cores -2 [default: FULL]
+                        available cores -2 [default: FULL]
 
 
 **Example:**
@@ -130,15 +134,15 @@ The `run-controller.R` script is run to create a optimized parameter file (`pars
 
 **Notes:**
 
-- The script can only calibrate one basin a time, although multiple can be done manually by utilizing only a portion of avaiable cores.
-- Multiple runs can use the same directory; results are placed in squentially numbered output directories, `results_por_01`, `results_por_02`, etc.
-- For cross validation runs: use `--cvfold [#]`. The cross validation fold number must have a correspond forcing file in the basin directory.  See [Required Directory Structure](#required-directory-structure) section for more information on the cross validation forcing file.
-- Light run (fewer optimizer iterations): use `--lite`.
-- Overwrite last results directory, i.e. cont increment the output directory: use `--overwrite`.
-- Control number of cores: `--cores [#]` or `--cores Full` (uses all available minus 2).
-- The number of iterations is set to 5000 (or 2500 for a lite run) and not user editiable intentionally based on extensive testing of what will produce stable parameter sets. 
+- The script can only calibrate one basin at a time, although multiple can be done manually by utilizing only a portion of avaiable cores (`--num_cores #`) and running multiple scripts simultaneously (i.e. poor man's parallelization).
+- Multiple runs can use the same input directory; results are placed in squentially numbered output directories, `results_por_01`, `results_por_02`, etc.
+- For cross validation runs: use `--cvfold [#]`. The cross validation fold number must have a corresponding forcing file in the basin directory.  See [Required Directory Structure](#required-directory-structure) section for more information on the cross validation forcing file.
+- Light run (half the number of optimizer iterations): use `--lite`. Note that this will take less real time to run but may result in a lower quality parameter set. 
+- To overwrite last results directory, i.e. don't increment the output directory: use `--overwrite` (ignored if no results exist).
+- To control number of utilized CPU cores: `--cores [#]` or `--cores FULL` (uses all available minus 2).
+- The number of iterations is set to 5000 (or 2500 for a lite run) and is intentionally not user editiable based on extensive testing of how many iterations will produce stable parameter sets. Note that it is still important to manage equally viable parameter sets (i.e. equifinal solutions) by setting appropriate ranges for optimized parameter sets. This is particularly important for multi zone basins. 
 - Increasing the number of cores used will not speed up the calibration but may make the calibration converge faster or come to a better overall solution. 
-- Supports calibration with daily, instantaneous, or both flow types.
+- The optimizer supports calibration with daily average, instantaneous, or both flow types.
 
 #### Objective Function Argument (`--objfun`)
 
@@ -157,19 +161,19 @@ Default: `nselognse_NULL`
 | lognse_nse                 | nse.25wlognse.75w_npbias99th   |
 | lognse_kge                 | lognse.4W_nse1112010203m.6W    |
 
-To create a custom objective function, edit the [obj_fun.R](https://github.com/geoffrey-walters/nwrfc-hydro-evolvingDDS/blob/main/obj_fun.R) file.
+To create a custom objective function, edit the [obj_fun.R](https://github.com/geoffrey-walters/nwrfc-hydro-evolvingDDS/blob/main/obj_fun.R) file and add your own function.
 
 **Notes:**
 1. Do not include `_obj` portion of function name in argument.
 2. Functions must accept `results_daily`, `results_inst` as inputs.
 3. Selection of objective function should consider availability of daily and instanteous flow observations.
-4. Errors in custom functions produce descriptive messages when running `run-controller.R` starting with  
+4. Errors in custom functions should produce descriptive messages when running `run-controller.R` starting with  
    `"Objective Function had the following error, exiting:"`
 5.   The [obj_fun.R](https://github.com/geoffrey-walters/nwrfc-hydro-evolvingDDS/blob/main/obj_fun.R) file includes additional guidance.
  
 ### 2. `postprocess.R`
 
-Once `run-controller.R` has been ran and the `pars_optimal.csv` file has been created in a run directory, `postprocess.R` can be run to create simulation timeseries csv files and other supporting tables.  Data files are outut into `<dir>/<basin>/<run>` and plots are output into `<dir>/<basin>/<run>/plots`.
+Once `run-controller.R` has been ran and the `pars_optimal.csv` file has been created in a run directory, `postprocess.R` can be run to create simulation timeseries csv files and other supporting tables.  Data files are output into `<dir>/<basin>/<run>` and plots are output into `<dir>/<basin>/<run>/plots`.
 
     usage: postprocess.R  [--] [--help] [--dir DIR] [--basins BASINS] 
           [--run RUN]
@@ -190,7 +194,7 @@ Once `run-controller.R` has been ran and the `pars_optimal.csv` file has been cr
 ```
 
 **Notes:**
-- The script processes all completed runs in `--dir` path by default unless `--basins` or `--run` is specified.
+- The script processes all completed runs for all basins in the `--dir` path by default unless `--basins` or `--run` is specified.
 
 ### 3. `cv-plots.R`
 
@@ -229,6 +233,8 @@ Once `run-controller.R` has been ran and the `pars_optimal.csv` file has been cr
 Use `--help` to view argument options:
 ```bash
 ./run-controller.R --help
+./postprocess.R --help
+./cv-plots.R --help
 ```
 
 #### CHANLOSS Model
