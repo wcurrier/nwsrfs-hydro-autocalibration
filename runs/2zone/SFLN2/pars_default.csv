@@ -194,7 +194,7 @@ cl_factor_12,chanloss,SFLN2,-99
 lat,consuse,SFLN2-CU,41.3
 area_km2,consuse,SFLN2-CU,74
 irr_eff,consuse,SFLN2-CU,0.5418
-min_flow_cmsd,consuse,SFLN2-CU,0.02
+min_flow,consuse,SFLN2-CU,0.02
 rf_accum_rate,consuse,SFLN2-CU,0.2
 rf_decay_rate,consuse,SFLN2-CU,1e-04
 peadj_cu_01,consuse,SFLN2-CU,0
