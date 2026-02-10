@@ -44,7 +44,7 @@ import::from(vctrs, vec_fill_missing)
 
 import::from(
   rfchydromodels, sac_snow_uh, sac_snow_uh_lagk, lagk, sac_snow, sac_snow_states,
-  uh, consuse, chanloss, fa_nwrfc
+  uh, consuse, chanloss, fa_nwrfc, rsnwelev
 )
 source("wrappers.R")
 source("obj_fun.R")
@@ -279,6 +279,42 @@ if (n_upstream > 0) {
   }
 }
 
+
+# RSNWELEV: Load area-elevation curve if available
+ae_tbl <- NULL
+ae_rda_file <- file.path(basin_dir, "area_elev_curve.rda")
+ae_csv_file <- file.path(basin_dir, "area_elev_curve.csv")
+
+if (file.exists(ae_rda_file)) {
+  # Load from .rda file
+  ae_env <- new.env()
+  load(ae_rda_file, envir = ae_env)
+  ae_tbl <- get(ls(ae_env)[1], envir = ae_env)
+  ae_tbl <- as.data.frame(ae_tbl)
+  cat(blue$bold("Loaded area-elevation curve from:", ae_rda_file), "\n")
+  cat("  Zones:", ncol(ae_tbl) - 1, " Rows:", nrow(ae_tbl), "\n")
+} else if (file.exists(ae_csv_file)) {
+  # Load from .csv file
+  ae_tbl <- read.csv(ae_csv_file)
+  cat(blue$bold("Loaded area-elevation curve from:", ae_csv_file), "\n")
+  cat("  Zones:", ncol(ae_tbl) - 1, " Rows:", nrow(ae_tbl), "\n")
+}
+
+# Check if pxtemp is in parameters but ae_tbl is missing
+if (any(default_pars$name == "pxtemp") && is.null(ae_tbl)) {
+  warning("pxtemp found in parameters but no area_elev_curve file found in ",
+          basin_dir, ". rsnwelev will not be used.")
+}
+
+# If ae_tbl is loaded, report rsnwelev status
+if (!is.null(ae_tbl) && any(default_pars$name == "pxtemp")) {
+  cat(blue$bold("rsnwelev enabled: ptps will be derived from pxtemp + talr + area-elev curve"), "\n")
+  settings_message <- paste0(settings_message, "rsnwelev: enabled\n")
+} else {
+  settings_message <- paste0(settings_message, "rsnwelev: disabled (using forcing ptps)\n")
+}
+
+
 # if we are doing cross validation, set the observations during the cv period to NA
 # that way the objective function will not get computed for that period
 if (cv) {
@@ -352,7 +388,8 @@ ptm <- proc.time()
 
 out <- run_controller_edds(
   lower, upper, basin, dt_hours, default_pars, obs_daily, obs_inst,
-  forcing_raw, upflow, obj_fun, n_zones, cu_zones, n_cores, lite
+  forcing_raw, upflow, obj_fun, n_zones, cu_zones, n_cores, lite,
+  ae_tbl = ae_tbl
 )
 
 p_optimal <- out["p_best"][[1]]
@@ -423,10 +460,11 @@ if (cu) {
 optimal_pars <- optimal_pars[order(zone, name)]
 
 # get optimized daily simulation
-optimal_sim_daily <- model_wrapper(p_optimal, names(lower), dt_hours, optimal_pars, obs_daily, obs_inst,
-  forcing_raw, upflow, obj_fun, n_zones, cu_zones,
-  return_flow = TRUE
-)
+optimal_sim_daily <- model_wrapper(p_optimal, names(lower), dt_hours, optimal_pars,
+                                   obs_daily, obs_inst, forcing_raw, upflow,
+                                   obj_fun, n_zones, cu_zones,
+                                   ae_tbl = ae_tbl,
+                                   return_flow = TRUE)
 
 # write csv output
 write.csv(optimal_pars, file = file.path(output_path, "pars_optimal.csv"), row.names = FALSE, quote = FALSE)

@@ -110,6 +110,7 @@ inst_to_ave <- function(forcing, sim_flow_cfs, agg_to_daily = FALSE) {
 
 model_wrapper <- function(p, p_names, dt_hours, default_pars, obs_daily, obs_inst,
                           forcing_raw, upflow, obj_fun, n_zones, cu_zones,
+                          ae_tbl = NULL,
                           return_flow = FALSE) {
   # browser()
 
@@ -132,11 +133,21 @@ model_wrapper <- function(p, p_names, dt_hours, default_pars, obs_daily, obs_ins
     pars <- update_cu_params(pars, zone1_name, cu_zones)
   }
 
-  # adjusted forcings
+  # ---------- Forcing adjustments ----------
+
+  # Auto-detect rsnwelev: if pxtemp exists in pars, use rsnwelev for ptps
+  use_rsnwelev <- any(pars$name == "pxtemp") && !is.null(ae_tbl)
+
   if (n_zones > 0) {
     forcing_adj <- fa_nwrfc(dt_hours, forcing_raw, pars)
   } else {
     forcing_adj <- forcing_raw
+  }
+
+  # If rsnwelev is active, replace ptps with physically-based values
+  # This overwrites whatever fa_nwrfc did to ptps
+  if (use_rsnwelev) {
+    forcing_adj <- rsnwelev(forcing_adj, pars, ae_tbl)
   }
 
   # Run the model
@@ -228,7 +239,8 @@ model_wrapper <- function(p, p_names, dt_hours, default_pars, obs_daily, obs_ins
 run_controller_edds <- function(lower, upper, basin, dt_hours, default_pars,
                                 obs_daily, obs_inst, forcing, upflow = NULL,
                                 obj_fun = "rmse", n_zones, cu_zones = character(0),
-                                n_cores, lite = FALSE) {
+                                n_cores, lite = FALSE,
+                                ae_tbl = NULL) {
   # browser()
   # ptm = proc.time()
 
@@ -249,7 +261,8 @@ run_controller_edds <- function(lower, upper, basin, dt_hours, default_pars,
     upflow = upflow,
     obj_fun = obj_fun,
     n_zones = n_zones,
-    cu_zones = cu_zones
+    cu_zones = cu_zones,
+    ae_tbl = ae_tbl
   )
 
 
@@ -388,7 +401,8 @@ ep_dds <- function(fn, p_bounds, t_iter = 1000, n_cores = 4, r = 0.2, ...) {
       upflow = upflow,
       obj_fun = obj_fun,
       n_zones = n_zones,
-      cu_zones = cu_zones
+      cu_zones = cu_zones,
+      ae_tbl = ae_tbl
     )
 
 

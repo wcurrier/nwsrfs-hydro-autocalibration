@@ -328,3 +328,7 @@ ptps_lower_11,fa_limit,SAKW1-2,0.498401988636365
 ptps_upper_11,fa_limit,SAKW1-2,0.653027692307693
 ptps_lower_12,fa_limit,SAKW1-2,0.698940340909091
 ptps_upper_12,fa_limit,SAKW1-2,0.866898717948718
+pxtemp,snow,SAKW1-1,1.0
+talr,snow,SAKW1-1,-0.65
+pxtemp,snow,SAKW1-2,1.0
+talr,snow,SAKW1-2,-0.65

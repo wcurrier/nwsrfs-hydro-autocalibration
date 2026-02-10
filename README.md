@@ -1,3 +1,152 @@
+# This Fork
+
+# Rain/Snow Partitioning via `rsnwelev` — Integration Summary
+
+## Motivation
+
+The `rsnwelev` model computes `ptps` dynamically from air temperature, a lapse rate, a rain/snow threshold temperature, and an area-elevation curve. This enables physically-based calibration of snow partitioning.
+
+## How It Works
+
+The `rsnwelev` Fortran subroutine (wrapping the NWSRFS `EX42` routine) computes a rain-snow elevation line at each timestep using:
+
+- **`pxtemp`** — Temperature threshold separating rain from snow (°C)
+- **`talr`** — Lapse rate during precipitation periods (°C/100m)
+- **`elev`** — Reference elevation for the air temperature time series (m) *(already existed in pars)*
+- **Area-elevation curve** — Lookup table mapping elevation quantiles?? to actual elevations per zone
+
+The rain-snow line is intersected with the area-elevation curve to determine what fraction of the basin is above/below the snow line, producing a `ptps` value (0 = all rain, 1 = all snow) at each timestep.
+
+## Changes
+
+### `pars_default.csv`
+
+Added two new parameters per zone under type `snow`:
+
+```
+pxtemp,snow,SAKW1-1,1.0
+talr,snow,SAKW1-1,-0.65
+pxtemp,snow,SAKW1-2,1.0
+talr,snow,SAKW1-2,-0.65
+```
+
+- `pxtemp`: default 1.0°C (rain/snow threshold)
+- `talr`: default -0.65°C/100m (standard environmental lapse rate)
+- All existing parameters (including `ptps` FA and `fa_limit` rows) are kept unchanged
+
+### `pars_limits.csv`
+
+Added calibration bounds for `pxtemp` and `talr`:
+
+```
+pxtemp_SAKW1-1,SAKW1-1,-1,3
+talr_SAKW1-1,SAKW1-1,-0.75,-0.55
+pxtemp_SAKW1-2,SAKW1-2,-1,3
+talr_SAKW1-2,SAKW1-2,-0.75,-0.55
+```
+
+Removed the 4 `ptps` forcing adjustment parameters from calibration (since `rsnwelev` replaces `ptps` entirely):
+
+- ~~`ptps_scale_SAKW1`~~
+- ~~`ptps_p_redist_SAKW1`~~
+- ~~`ptps_std_SAKW1`~~
+- ~~`ptps_shift_SAKW1`~~
+
+> **Note:** The `ptps_*` FA parameters and `ptps_lower/upper` FA limit rows remain in `pars_default.csv` — they are still read by `fa_nwrfc` but have no effect because `rsnwelev` overwrites `ptps` afterward. They are simply not calibrated.
+
+### `area_elev_curve.csv` (new file, per basin)
+
+A CSV with elevation quantiles per zone. Example for SAKW1 (2 zones):
+
+```csv
+quantile,SAKW1-1,SAKW1-2
+0,305,610
+0.05,366,762
+0.1,427,914
+...
+1,1372,2438
+```
+
+Place in the basin directory (e.g., `runs/2zone/SAKW1/area_elev_curve.csv`). Also supports `.rda` format.
+
+### `wrappers.R`
+
+**`model_wrapper()`** — New optional argument `ae_tbl = NULL`:
+
+```r
+model_wrapper <- function(p, p_names, dt_hours, default_pars, obs_daily, obs_inst,
+                          forcing_raw, upflow, obj_fun, n_zones, cu_zones,
+                          ae_tbl = NULL,        # <-- NEW
+                          return_flow = FALSE)
+```
+
+Auto-detection logic added after `fa_nwrfc` forcing adjustment:
+
+```r
+use_rsnwelev <- any(pars$name == "pxtemp") && !is.null(ae_tbl)
+
+if (use_rsnwelev) {
+  forcing_adj <- rsnwelev(forcing_adj, pars, ae_tbl)
+}
+```
+
+This is **backward compatible** — if `pxtemp` is not in `pars_default.csv` or no `ae_tbl` is provided, the model runs exactly as before using the forcing file `ptps` values.
+
+**`run_controller_edds()`** — New optional argument `ae_tbl = NULL`, passed through to `model_wrapper` and parallel workers.
+
+### `run-controller.R`
+
+Four changes:
+
+1. **Import**: Added `rsnwelev` to `import::from(rfchydromodels, ...)`
+2. **Load area-elevation curve** (after upflow loading, before CV section):
+   ```r
+   ae_tbl <- NULL
+   ae_rda_file <- file.path(basin_dir, "area_elev_curve.rda")
+   ae_csv_file <- file.path(basin_dir, "area_elev_curve.csv")
+   if (file.exists(ae_rda_file)) {
+     # load from .rda
+   } else if (file.exists(ae_csv_file)) {
+     ae_tbl <- read.csv(ae_csv_file)
+   }
+   ```
+3. **Pass `ae_tbl`** to `run_controller_edds()`
+4. **Pass `ae_tbl`** to final `model_wrapper()` call for optimal output
+
+## Activation
+
+`rsnwelev` activates automatically when **both** conditions are met:
+
+1. `pxtemp` exists as a parameter name in `pars_default.csv`
+2. An `area_elev_curve.csv` (or `.rda`) file exists in the basin directory
+
+If either is missing, the model falls back to the original behavior (FA-adjusted forcing `ptps`).
+
+## Execution Order
+
+```
+forcing_raw
+    │
+    ▼
+fa_nwrfc(forcing_raw, pars)          # Standard forcing adjustments (map, mat, pet, ptps)
+    │
+    ▼
+rsnwelev(forcing_adj, pars, ae_tbl)  # Overwrites ptps with physically-based values
+    │                                 # (only if pxtemp in pars AND ae_tbl loaded)
+    ▼
+sac_snow_uh(forcing_adj, pars)       # Model run uses rsnwelev-derived ptps
+```
+
+## Testing
+
+Recommended test progression before running full optimization:
+
+1. **Standalone `rsnwelev`** — Verify ptps output varies with temperature and differs from forcing file values
+2. **Single `model_wrapper` call** — Confirm the full pipeline runs without error using midpoint parameter values
+3. **`pxtemp` sensitivity** — Run with `pxtemp=-1` vs `pxtemp=3` and confirm different flow outputs
+4. **Short optimization** — `--lite --num_cores 4` to verify DDS parallel workers receive `ae_tbl` correctly
+
+
 # NWRFC Autocalibration Framework
 
 ## Description

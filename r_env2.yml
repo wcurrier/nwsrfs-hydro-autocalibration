@@ -1,0 +1,14 @@
+name: r_env2
+channels:
+  - conda-forge
+dependencies:
+  - r-base >=4.1
+  - r-sf
+  - r-terra
+  - r-reshape2
+  - r-devtools
+  - r-ncdf4
+  - r-png
+  - r-ggmap
+  - r-rcurl
+  - libgit2
