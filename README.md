@@ -146,6 +146,16 @@ Recommended test progression before running full optimization:
 3. **`pxtemp` sensitivity** — Run with `pxtemp=-1` vs `pxtemp=3` and confirm different flow outputs
 4. **Short optimization** — `--lite --num_cores 4` to verify DDS parallel workers receive `ae_tbl` correctly
 
+## Note:
+
+The `ptps` column still needs to exist in the forcing file because `fa_nwrfc` reads it before `rsnwelev` overwrites it. If you remove the column entirely, `fa_nwrfc` will crash when it tries to access `forcing[["ptps"]]`.
+However, the actual **values** don't matter when `rsnwelev` is active — they get overwritten. So you have two options:
+
+1. **Keep the existing ptps values** in the forcing files (simplest, no changes needed)
+2. **Fill ptps with zeros** (e.g., `ptps = 0` for every row) — makes it clear they're placeholders
+
+Either way, the final `ptps` used by `sac_snow` will be the physically-based values computed from `pxtemp`, `talr`, and the area-elevation curve.
+If you wanted to make the column truly optional in the future, you'd need to modify `fa_nwrfc` to skip ptps adjustment when the column is missing or when `rsnwelev` is active — but that's a larger change for later.
 
 # NWRFC Autocalibration Framework
 
