@@ -45,13 +45,6 @@ pxtemp_SAKW1-2,SAKW1-2,-1,3
 talr_SAKW1-2,SAKW1-2,-0.75,-0.55
 ```
 
-Removed the 4 `ptps` forcing adjustment parameters from calibration (since `rsnwelev` replaces `ptps` entirely):
-
-- ~~`ptps_scale_SAKW1`~~
-- ~~`ptps_p_redist_SAKW1`~~
-- ~~`ptps_std_SAKW1`~~
-- ~~`ptps_shift_SAKW1`~~
-
 > **Note:** The `ptps_*` FA parameters and `ptps_lower/upper` FA limit rows remain in `pars_default.csv` — they are still read by `fa_nwrfc` but have no effect because `rsnwelev` overwrites `ptps` afterward. They are simply not calibrated.
 
 ### `area_elev_curve.csv` (new file, per basin)
