@@ -138,6 +138,22 @@ model_wrapper <- function(p, p_names, dt_hours, default_pars, obs_daily, obs_ins
   # Auto-detect rsnwelev: if pxtemp exists in pars, use rsnwelev for ptps
   use_rsnwelev <- any(pars$name == "pxtemp") && !is.null(ae_tbl)
 
+  # If ptps is missing from forcing, we need rsnwelev to compute it.
+  # Add a placeholder so fa_nwrfc can run; rsnwelev will overwrite it.
+  needs_ptps <- any(vapply(forcing_raw, function(x) is.null(x[["ptps"]]), logical(1)))
+  if (needs_ptps) {
+    if (!use_rsnwelev) {
+      stop("ptps column is missing from forcing and cannot be computed: ",
+           "either provide ptps in the forcing files, or provide both ",
+           "pxtemp/talr parameters and an area-elevation table (ae_tbl).")
+    }
+    for (z in seq_along(forcing_raw)) {
+      if (is.null(forcing_raw[[z]][["ptps"]])) {
+        forcing_raw[[z]][["ptps"]] <- 0 # add the placeholder so fa_nwrfc can run
+      }
+    }
+  }  
+    
   if (n_zones > 0) {
     forcing_adj <- fa_nwrfc(dt_hours, forcing_raw, pars)
   } else {
