@@ -45,7 +45,6 @@ pxtemp_SAKW1-2,SAKW1-2,-1,3
 talr_SAKW1-2,SAKW1-2,0.55,0.75
 ```
 
-> **Note:** The `ptps_*` FA parameters and `ptps_lower/upper` FA limit rows remain in `pars_default.csv` — they are still read by `fa_nwrfc` but have no effect because `rsnwelev` overwrites `ptps` afterward. They are simply not calibrated.
 
 ### `area_elev_curve.csv` (new file, per basin)
 
@@ -144,17 +143,6 @@ Recommended test progression before running full optimization:
 2. **Single `model_wrapper` call** — Confirm the full pipeline runs without error using midpoint parameter values
 3. **`pxtemp` sensitivity** — Run with `pxtemp=-1` vs `pxtemp=3` and confirm different flow outputs
 4. **Short optimization** — `--lite --num_cores 4` to verify DDS parallel workers receive `ae_tbl` correctly
-
-## Note:
-
-The `ptps` column still needs to exist in the forcing file because `fa_nwrfc` reads it before `rsnwelev` overwrites it. If you remove the column entirely, `fa_nwrfc` will crash when it tries to access `forcing[["ptps"]]`.
-However, the actual **values** don't matter when `rsnwelev` is active — they get overwritten. So you have two options:
-
-1. **Keep the existing ptps values** in the forcing files (simplest, no changes needed)
-2. **Fill ptps with zeros** (e.g., `ptps = 0` for every row) — makes it clear they're placeholders
-
-Either way, the final `ptps` used by `sac_snow` will be the physically-based values computed from `pxtemp`, `talr`, and the area-elevation curve.
-If you wanted to make the column truly optional in the future, you'd need to modify `fa_nwrfc` to skip ptps adjustment when the column is missing or when `rsnwelev` is active — but that's a larger change for later.
 
 # NWRFC Autocalibration Framework
 
