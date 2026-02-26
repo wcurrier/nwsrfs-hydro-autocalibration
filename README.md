@@ -25,13 +25,13 @@ Added two new parameters per zone under type `snow`:
 
 ```
 pxtemp,snow,SAKW1-1,1.0
-talr,snow,SAKW1-1,-0.65
+talr,snow,SAKW1-1,0.65
 pxtemp,snow,SAKW1-2,1.0
-talr,snow,SAKW1-2,-0.65
+talr,snow,SAKW1-2,0.65
 ```
 
 - `pxtemp`: default 1.0°C (rain/snow threshold)
-- `talr`: default -0.65°C/100m (standard environmental lapse rate)
+- `talr`: default 0.65°C/100m (standard environmental lapse rate)
 - All existing parameters (including `ptps` FA and `fa_limit` rows) are kept unchanged
 
 ### `pars_limits.csv`
@@ -40,9 +40,9 @@ Added calibration bounds for `pxtemp` and `talr`:
 
 ```
 pxtemp_SAKW1-1,SAKW1-1,-1,3
-talr_SAKW1-1,SAKW1-1,-0.75,-0.55
+talr_SAKW1-1,SAKW1-1,0.55,0.75
 pxtemp_SAKW1-2,SAKW1-2,-1,3
-talr_SAKW1-2,SAKW1-2,-0.75,-0.55
+talr_SAKW1-2,SAKW1-2,0.55,0.75
 ```
 
 > **Note:** The `ptps_*` FA parameters and `ptps_lower/upper` FA limit rows remain in `pars_default.csv` — they are still read by `fa_nwrfc` but have no effect because `rsnwelev` overwrites `ptps` afterward. They are simply not calibrated.
@@ -105,6 +105,12 @@ Four changes:
    ```
 3. **Pass `ae_tbl`** to `run_controller_edds()`
 4. **Pass `ae_tbl`** to final `model_wrapper()` call for optimal output
+
+
+Example run:
+
+`Rscript run-controller.R --dir runs/2zone --basin SAKW1 \
+  --objfun nselognse_NULL --por --lite --num_cores 4`
 
 ## Activation
 
