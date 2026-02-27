@@ -98,7 +98,22 @@ basins <- if (any(is.na(basins))) {
 }
 
 for (basin in basins) {
+    
   basin_dir <- file.path(output_dir, basin)
+    
+    # RSNWELEV: Load area-elevation curve if available
+    ae_tbl <- NULL
+    ae_rda_file <- file.path(basin_dir, "area_elev_curve.rda")
+    ae_csv_file <- file.path(basin_dir, "area_elev_curve.csv")
+    if (file.exists(ae_rda_file)) {
+      ae_env <- new.env()
+      load(ae_rda_file, envir = ae_env)
+      ae_tbl <- get(ls(ae_env)[1], envir = ae_env)
+      ae_tbl <- as.data.frame(ae_tbl)
+    } else if (file.exists(ae_csv_file)) {
+      ae_tbl <- read.csv(ae_csv_file, check.names = FALSE)
+    }
+    
   results_dirs <- list.files(basin_dir, paste0(results_dir_prefix, "*"))
 
   # if the user specified an output directory, then use that
@@ -180,6 +195,12 @@ for (basin in basins) {
           select(-wyear) |>
           as.data.table()
       }
+      # Add ptps placeholder to subset if missing
+      for (z in seq_along(forcing_raw_subset)) {
+        if (is.null(forcing_raw_subset[[z]][["ptps"]])) {
+          forcing_raw_subset[[z]][["ptps"]] <- 0
+        }
+      }
       forcing_subset_climo <- fa_adj_nwrfc(dt_hours, forcing_raw_subset, optimal_pars, return_climo = TRUE) |>
         data.matrix()
       if (n_zones > 0) {
@@ -187,13 +208,39 @@ for (basin in basins) {
       } else {
         forcing <- forcing_raw
       }
-    } else {
-      forcing_raw_subset <- forcing_subset_climo <- NULL
-      if (n_zones > 0) {
-        forcing <- fa_nwrfc(dt_hours, forcing_raw, optimal_pars)
-      } else {
-        forcing <- forcing_raw
+      if (use_rsnwelev) {
+        forcing <- rsnwelev(forcing, optimal_pars, ae_tbl)
       }
+    } else {
+#       forcing_raw_subset <- forcing_subset_climo <- NULL
+#       if (n_zones > 0) {
+#         forcing <- fa_nwrfc(dt_hours, forcing_raw, optimal_pars)
+#       } else {
+#         forcing <- forcing_raw
+#       }
+      forcing_raw_subset <- forcing_subset_climo <- NULL
+
+      # Add ptps placeholder if missing; rsnwelev will overwrite
+      use_rsnwelev <- any(optimal_pars$name == "pxtemp") && !is.null(ae_tbl)
+      for (z in seq_along(forcing_raw)) {
+        if (is.null(forcing_raw[[z]][["ptps"]])) {
+          if (!use_rsnwelev) {
+            stop("ptps column is missing from forcing and cannot be computed: ",
+                 "either provide ptps in the forcing files, or provide both ",
+                 "pxtemp/talr parameters and an area-elevation table (ae_tbl).")
+          }
+          forcing_raw[[z]][["ptps"]] <- 0
+        }
+      }
+
+    if (n_zones > 0) {
+      forcing <- fa_nwrfc(dt_hours, forcing_raw, optimal_pars)
+    } else {
+      forcing <- forcing_raw
+    }
+    if (use_rsnwelev) {
+      forcing <- rsnwelev(forcing, optimal_pars, ae_tbl)
+    }
     }
 
     # If no zones, then the run is a routing reach only.  Revert dummy zone and zones back to NULL
@@ -219,7 +266,7 @@ for (basin in basins) {
         right_join(
           forcing_raw[[1]] |>
             as.data.table() |>
-            dplyr::select(-c("map_mm", "mat_degc", "ptps")),
+            dplyr::select(-any_of(c("map_mm", "mat_degc", "ptps"))),
           by = c("year", "month", "day", "hour")
         ) |>
         as_tibble()
@@ -239,7 +286,7 @@ for (basin in basins) {
           right_join(
             forcing_raw[[1]] |>
               as.data.table() |>
-              dplyr::select(-c("map_mm", "mat_degc", "ptps")),
+              dplyr::select(-any_of(c("map_mm", "mat_degc", "ptps"))),
             by = c("year", "month", "day", "hour")
           ) |>
           mutate(flow_cfs = vctrs::vec_fill_missing(flow_cfs, max_fill = 4)) |>

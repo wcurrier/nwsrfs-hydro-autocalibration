@@ -271,7 +271,7 @@ if (n_upstream > 0) {
       right_join(
         forcing_raw[[1]] |>
           as.data.table() |>
-          dplyr::select(-c("map_mm", "mat_degc", "ptps")),
+          dplyr::select(-any_of(-c("map_mm", "mat_degc", "ptps"))),
         by = c("year", "month", "day", "hour")
       ) |>
       mutate(flow_cfs = vctrs::vec_fill_missing(flow_cfs, max_fill = 4)) |>
