@@ -446,18 +446,30 @@ ggsave(sprintf("%s/trajectories_best.pdf", plot_path), ptraj, width = 10, height
 
 ### Get optimized parameters
 optimal_pars <- update_params(p_optimal, names(lower), default_pars)
-if (n_zones > 0) {
-  forcing <- fa_nwrfc(dt_hours, forcing_raw, optimal_pars)
-} else {
-  forcing <- forcing_raw
-}
 
 # if there are any consuse zones, replace those params with the zone 1 params
 if (cu) {
-  zone1_name <- names(forcing)[1]
+  zone1_name <- names(forcing_raw)[1]
   optimal_pars <- update_cu_params(optimal_pars, zone1_name, cu_zones)
 }
 optimal_pars <- optimal_pars[order(zone, name)]
+
+# Apply forcing adjustments (mirrors model_wrapper logic)
+use_rsnwelev <- any(optimal_pars$name == "pxtemp") && !is.null(ae_tbl)
+forcing_out <- forcing_raw
+for (z in seq_along(forcing_out)) {
+  if (is.null(forcing_out[[z]][["ptps"]])) {
+    forcing_out[[z]][["ptps"]] <- 0
+  }
+}
+if (n_zones > 0) {
+  forcing <- fa_nwrfc(dt_hours, forcing_out, optimal_pars)
+} else {
+  forcing <- forcing_out
+}
+if (use_rsnwelev) {
+  forcing <- rsnwelev(forcing, optimal_pars, ae_tbl)
+}
 
 # get optimized daily simulation
 optimal_sim_daily <- model_wrapper(p_optimal, names(lower), dt_hours, optimal_pars,
